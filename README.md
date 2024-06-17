@@ -4,7 +4,7 @@
 > [!NOTE]
 > 此 benchmark fork 至 [hiyuki/mp-framework-benchmark](https://github.com/hiyuki/mp-framework-benchmark)，原作者为董宏平（hiyuki），本文中的第一人称也指原作者。在此表示感谢。
 
-> 本文的所有数据均使用 iPhone XR 测得（iOS v17.5.1，微信 v8.0.49），测试全程手机电量维持 100%，并连接着充电器。每项测试跑三次取平均数。
+> 本文的所有数据均使用 iPhone XR 测得（iOS v17.5.1，微信 v8.0.49），测试全程手机电量维持 100%，并连接着充电器。每项测试跑三次取平均数，数据单位为毫秒（ms）。
 
 在本文中，我们将对小程序原生框架、[Vue Mini](https://vuemini.org) (v1.0.0-rc.11) 以及 [Taro](https://taro.zone) (v3.6.32) 进行性能测试，测试内容包括以下几个维度：
 
