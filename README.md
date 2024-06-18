@@ -29,6 +29,10 @@
 
 ### 动态测试场景
 
+<p>
+  <img src="https://github.com/yangmingshan/mp-framework-benchmark/blob/main/media/dynamic.jpeg?raw=true&v2" width="414">
+</p>
+
 动态测试中，视图基于数据动态渲染，静态节点较少，视图更新耗时是该测试场景中的主要测试点。
 
 动态测试 Demo 模拟了实际业务中常见的长列表 + 多 Tab 场景，该 Demo 中存在两份优惠券列表数据，一份为可用券数据，另一份为不可用券数据，其中同一时刻视图中只会渲染展示其中一份数据，可以在上方的操作区模拟对列表数据的各种操作及视图展示切换(切换 Tab)。
@@ -36,6 +40,10 @@
 在动态测试中，我在外部通过函数代理的方式在初始化之前将 App、Page 和 Component 构造器进行代理，通过 mixin 的方式在 Page 的 onLoad 和 Component 的 created 钩子中注入 setData 拦截逻辑，对所有页面和组件的 setData 调用进行监听，并统计小程序的视图更新耗时。该测试方式能够做到对框架代码的零侵入，能够跟踪到小程序全量的 setData 行为并进行独立的耗时计算，具有很强的普适性，代码具体实现可以查看：https://github.com/hiyuki/mp-framework-benchmark/blob/master/utils/proxy.js
 
 ### 静态测试场景
+
+<p>
+  <img src="https://github.com/yangmingshan/mp-framework-benchmark/blob/main/media/static.jpeg?raw=true" width="414">
+</p>
 
 静态测试模拟业务中静态页面的场景，如运营活动和文章等页面，页面内具备大量的静态节点，而没有数据动态渲染，初始 ready 耗时是该场景下测试的重心。
 
