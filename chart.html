@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小程序框架性能大比拼</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.0.0/dist/echarts.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 2rem 1rem;
+  }
+  h1 {
+    text-align: center;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    text-align: center;
+    color: #94a3b8;
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+  }
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .section {
+    margin-bottom: 3rem;
+  }
+  .section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1rem;
+    padding-left: 0.75rem;
+    border-left: 4px solid #60a5fa;
+    color: #f1f5f9;
+  }
+  .chart-box {
+    background: #1e293b;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3);
+  }
+  .chart {
+    width: 100%;
+    height: 420px;
+  }
+  .chart-sm {
+    height: 360px;
+  }
+  .tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-left: 1rem;
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    padding: 0.4rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    background: #3b82f6;
+    color: #fff;
+    border-color: #3b82f6;
+  }
+  @media (max-width: 640px) {
+    body { padding: 1rem 0.5rem; }
+    h1 { font-size: 1.5rem; }
+    .subtitle { font-size: 0.75rem; margin-bottom: 1.2rem; }
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 1.15rem; margin-bottom: 0.75rem; }
+    .chart-box { padding: 0.5rem; border-radius: 8px; margin-bottom: 1rem; }
+    .chart { height: 300px; }
+    .chart-sm { height: 260px; }
+    .tabs { padding-left: 0.5rem; gap: 0.35rem; margin-bottom: 0.75rem; }
+    .tab-btn { padding: 0.45rem 0.7rem; font-size: 0.78rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>小程序框架性能大比拼</h1>
+  <p class="subtitle">Native vs Rezor (v0.1.1) vs Taro React (v4.2.0) &mdash; iPhone XR, iOS 18.7.7, WeChat 8.0.70</p>
+
+  <div class="section">
+    <h2>动态测试 - 页面更新耗时</h2>
+
+    <div class="tabs" id="incr-tabs">
+      <button class="tab-btn active" onclick="switchIncr('no-bg')">无后台数据（递增100）</button>
+      <button class="tab-btn" onclick="switchIncr('bg')">有后台数据（递增100）</button>
+    </div>
+    <div class="chart-box"><div class="chart" id="chart-incr"></div></div>
+
+    <div class="tabs" id="ops-tabs">
+      <button class="tab-btn active" onclick="switchOps('no-bg')">无后台数据（操作）</button>
+      <button class="tab-btn" onclick="switchOps('bg')">有后台数据（操作）</button>
+    </div>
+    <div class="chart-box"><div class="chart" id="chart-ops"></div></div>
+  </div>
+
+  <div class="section">
+    <h2>大数据量场景（递增1000）</h2>
+    <div class="tabs" id="big-tabs">
+      <button class="tab-btn active" onclick="switchBig('no-bg')">无后台数据</button>
+      <button class="tab-btn" onclick="switchBig('bg')">有后台数据</button>
+    </div>
+    <div class="chart-box"><div class="chart" id="chart-big"></div></div>
+  </div>
+
+  <div class="section">
+    <h2>切换 Tab 耗时</h2>
+    <div class="chart-box"><div class="chart chart-sm" id="chart-tab"></div></div>
+  </div>
+
+  <div class="section">
+    <h2>局部更新耗时</h2>
+    <div class="chart-box"><div class="chart chart-sm" id="chart-partial"></div></div>
+  </div>
+
+  <div class="section">
+    <h2>静态测试 - 页面渲染耗时</h2>
+    <div class="chart-box"><div class="chart chart-sm" id="chart-static"></div></div>
+  </div>
+</div>
+
+<script>
+const COLORS = {
+  Native: '#22c55e',
+  Rezor:  '#3b82f6',
+  Taro:   '#ef4444'
+};
+
+const isMobile = window.innerWidth <= 640;
+
+function baseOption(title, xData, series, unit='ms') {
+  return {
+    title: {
+      text: title,
+      left: 'center',
+      top: 5,
+      textStyle: { color: '#e2e8f0', fontSize: isMobile ? 12 : 14 }
+    },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      backgroundColor: '#1e293b',
+      borderColor: '#334155',
+      textStyle: { color: '#e2e8f0', fontSize: isMobile ? 11 : 14 },
+      formatter: function(params) {
+        let s = `<b>${params[0].axisValue}</b><br/>`;
+        params.forEach(p => {
+          s += `<span style="color:${p.color}">\u25CF</span> ${p.seriesName}: <b>${p.value}</b> ${unit}<br/>`;
+        });
+        return s;
+      }
+    },
+    legend: {
+      top: isMobile ? 25 : 30,
+      textStyle: { color: '#94a3b8', fontSize: isMobile ? 11 : 12 },
+      itemWidth: isMobile ? 18 : 25,
+      itemHeight: isMobile ? 10 : 14,
+      itemGap: isMobile ? 8 : 10
+    },
+    grid: {
+      top: isMobile ? 58 : 70,
+      bottom: isMobile ? 30 : 40,
+      left: isMobile ? 45 : 60,
+      right: isMobile ? 15 : 30
+    },
+    xAxis: {
+      type: 'category',
+      data: xData,
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: isMobile ? 10 : 12,
+        rotate: isMobile && xData.length > 6 ? 30 : 0
+      },
+      axisLine: { lineStyle: { color: '#334155' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: unit,
+      nameTextStyle: { color: '#94a3b8', fontSize: isMobile ? 10 : 12 },
+      axisLabel: { color: '#94a3b8', fontSize: isMobile ? 10 : 12 },
+      splitLine: { lineStyle: { color: '#1e293b' } }
+    },
+    series: series.map(s => ({
+      name: s.name,
+      type: 'line',
+      data: s.data,
+      smooth: true,
+      symbol: 'circle',
+      symbolSize: isMobile ? 4 : 6,
+      lineStyle: { width: isMobile ? 2 : 3 },
+      itemStyle: { color: COLORS[s.name] },
+      emphasis: { focus: 'series' }
+    }))
+  };
+}
+
+function barOption(title, cats, series, unit='ms') {
+  return {
+    title: {
+      text: title,
+      left: 'center',
+      top: 5,
+      textStyle: { color: '#e2e8f0', fontSize: isMobile ? 12 : 14 }
+    },
+    tooltip: {
+      trigger: 'axis',
+      confine: true,
+      backgroundColor: '#1e293b',
+      borderColor: '#334155',
+      textStyle: { color: '#e2e8f0', fontSize: isMobile ? 11 : 14 },
+      formatter: function(params) {
+        let s = `<b>${params[0].axisValue}</b><br/>`;
+        params.forEach(p => {
+          if (p.value != null) s += `<span style="color:${p.color}">\u25CF</span> ${p.seriesName}: <b>${p.value}</b> ${unit}<br/>`;
+        });
+        return s;
+      }
+    },
+    legend: {
+      top: isMobile ? 25 : 30,
+      textStyle: { color: '#94a3b8', fontSize: isMobile ? 11 : 12 },
+      itemWidth: isMobile ? 18 : 25,
+      itemHeight: isMobile ? 10 : 14,
+      itemGap: isMobile ? 8 : 10
+    },
+    grid: {
+      top: isMobile ? 58 : 70,
+      bottom: isMobile ? 30 : 40,
+      left: isMobile ? 45 : 60,
+      right: isMobile ? 15 : 30
+    },
+    xAxis: {
+      type: 'category',
+      data: cats,
+      axisLabel: {
+        color: '#94a3b8',
+        fontSize: isMobile ? 10 : 12,
+        rotate: isMobile && cats.length > 3 ? 20 : 0
+      },
+      axisLine: { lineStyle: { color: '#334155' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: unit,
+      nameTextStyle: { color: '#94a3b8', fontSize: isMobile ? 10 : 12 },
+      axisLabel: { color: '#94a3b8', fontSize: isMobile ? 10 : 12 },
+      splitLine: { lineStyle: { color: '#1e293b' } }
+    },
+    series: series.map(s => ({
+      name: s.name,
+      type: 'bar',
+      data: s.data,
+      itemStyle: { color: COLORS[s.name], borderRadius: [4,4,0,0] },
+      barMaxWidth: isMobile ? 24 : 40,
+      emphasis: { focus: 'series' }
+    }))
+  };
+}
+
+// === Charts ===
+const allCharts = [];
+
+function initChart(id) {
+  const c = echarts.init(document.getElementById(id));
+  allCharts.push(c);
+  return c;
+}
+
+const chartIncr = initChart('chart-incr');
+const chartOps  = initChart('chart-ops');
+const chartBig  = initChart('chart-big');
+
+// Incr 100 data
+const incrData = {
+  'no-bg': {
+    x: ['100','200','300','400','500','600','700','800','900','1000'],
+    native: [75,74,77,73,79,86,92,100,95,112],
+    rezor:  [90,87,81,95,87,83,116,103,95,123],
+    taro:   [386,564,717,873,1066,1228,1391,1561,1706,1858]
+  },
+  'bg': {
+    x: ['100','200','300','400','500','600','700','800','900','1000'],
+    native: [76,74,68,87,86,87,87,105,101,135],
+    rezor:  [88,83,98,89,87,96,102,116,131,122],
+    taro:   [446,567,744,880,1027,1227,1558,1664,1755,1888]
+  }
+};
+
+function switchIncr(key) {
+  document.querySelectorAll('#incr-tabs .tab-btn').forEach((b,i) => b.classList.toggle('active', (key==='no-bg'?0:1)===i));
+  const d = incrData[key];
+  const title = key === 'no-bg' ? '新增可用券（递增100）- 无后台数据' : '新增可用券（递增100）- 有后台数据';
+  chartIncr.setOption(baseOption(title, d.x, [
+    { name:'Native', data:d.native },
+    { name:'Rezor',  data:d.rezor },
+    { name:'Taro',   data:d.taro }
+  ]));
+}
+switchIncr('no-bg');
+
+// Ops data
+const opsData = {
+  'no-bg': {
+    x: ['Delete(All)','Add(1000)','Update(1)','Update(All)','Delete(1)'],
+    native: [48,348,79,80,75],
+    rezor:  [69,423,79,83,79],
+    taro:   [135,3510,1693,2346,2103]
+  },
+  'bg': {
+    x: ['Delete(All)','Add(1000)','Update(1)','Update(All)','Delete(1)'],
+    native: [52,376,78,77,79],
+    rezor:  [52,471,80,86,80],
+    taro:   [141,3550,1704,2356,2085]
+  }
+};
+
+function switchOps(key) {
+  document.querySelectorAll('#ops-tabs .tab-btn').forEach((b,i) => b.classList.toggle('active', (key==='no-bg'?0:1)===i));
+  const d = opsData[key];
+  const title = key === 'no-bg' ? '操作耗时 - 无后台数据' : '操作耗时 - 有后台数据';
+  chartOps.setOption(barOption(title, d.x, [
+    { name:'Native', data:d.native },
+    { name:'Rezor',  data:d.rezor },
+    { name:'Taro',   data:d.taro }
+  ]));
+}
+switchOps('no-bg');
+
+// Big data
+const bigData = {
+  'no-bg': {
+    x: ['1000','2000','3000','4000','5000'],
+    native: [445,404,427,484,566],
+    rezor:  [521,497,598,571,705],
+    taro:   [3673,5756,8041,11905,15646]
+  },
+  'bg': {
+    x: ['1000','2000','3000','4000','5000'],
+    native: [454,407,429,507,575],
+    rezor:  [535,518,610,605,710],
+    taro:   [3742,5745,8061,12265,15939]
+  }
+};
+
+function switchBig(key) {
+  document.querySelectorAll('#big-tabs .tab-btn').forEach((b,i) => b.classList.toggle('active', (key==='no-bg'?0:1)===i));
+  const d = bigData[key];
+  const title = key === 'no-bg' ? '大数据量递增1000 - 无后台数据' : '大数据量递增1000 - 有后台数据';
+  chartBig.setOption(baseOption(title, d.x, [
+    { name:'Native', data:d.native },
+    { name:'Rezor',  data:d.rezor },
+    { name:'Taro',   data:d.taro }
+  ]));
+}
+switchBig('no-bg');
+
+// Tab switch
+const chartTab = initChart('chart-tab');
+chartTab.setOption(barOption('切换 Tab', ['Add Invalid(1000)','Switch to Invalid'], [
+  { name:'Native', data:[31, 428] },
+  { name:'Rezor',  data:[28, 509] },
+  { name:'Taro',   data:[null, 3405] }
+]));
+
+// Partial update
+const chartPartial = initChart('chart-partial');
+chartPartial.setOption(barOption('局部更新 - 选中券', ['Select(100)','Select(1000)'], [
+  { name:'Native', data:[7, 5] },
+  { name:'Rezor',  data:[5, 6] },
+  { name:'Taro',   data:[193, 1618] }
+]));
+
+// Static test
+const chartStatic = initChart('chart-static');
+chartStatic.setOption(barOption('静态页面渲染耗时', ['Page Render'], [
+  { name:'Native', data:[108] },
+  { name:'Rezor',  data:[117] },
+  { name:'Taro',   data:[137] }
+]));
+
+// Responsive resize
+window.addEventListener('resize', () => {
+  allCharts.forEach(c => c.resize());
+});
+</script>
+</body>
+</html>
